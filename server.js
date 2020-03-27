@@ -227,6 +227,129 @@ app.delete('/users/:id', isAuthorized, (req, res)=>{
     })
 })
 
+//TRANSAKSI
+
+app.post('/obat/:id/take', isAuthorized, (req, res) => {
+    let data = req.body
+
+    db.query(`
+
+        insert into transaksi (user_id, obat_id, jumlah)
+        values ('`+data.user_id+`', '`+req.params.id+`', '`+data.jumlah+`')
+    `, (err, result) => {
+        if (err) throw err
+    })
+
+    db.query(`
+        update obat
+        set stock = stock - 1
+        where id = '`+req.params.id+`'
+    `, (err, result) => {
+        if (err) throw err
+    })
+
+    res.json({
+        message: "Medicine has been taked by user"
+    })
+})
+
+app.get('/users/:id/obat', isAuthorized, (req, res) => {
+    db.query(`
+        select obat.nama, obat.jenis, obat.stock, obat.harga
+        from users
+        right join transaksi on users.id = transaksi.user_id
+        right join obat on transaksi.obat_id = obat.id
+        where users.id = '`+req.params.id+`'
+    `, (err, result) => {
+        if (err) throw err
+
+        res.json({
+            message: "success get user's medicine",
+            data: result
+        })
+    })
+})
+
+app.put('/transaksi/:id', isAuthorized, (req, res) => {  
+    let data = req.body
+
+    let sql = `
+        update transaksi
+        set user_id = '`+data.user_id+`', obat_id= '`+data.obat_id+`'
+        where id = '`+req.params.id+`'
+    `
+
+    db.query(sql, (err, result) => {
+        if (err) throw err
+
+        res.json({
+            message: "data has been updated",
+            data: result
+        })
+    })
+})
+
+app.delete('/transaksi/:id', isAuthorized, (req, res) => {
+    let sql = `
+        delete from transaksi
+        where id = '`+req.params.id+`'
+    `
+
+    db.query(sql, (err, result) => {
+        if (err) throw err
+        
+        res.json({
+            message: "data has been deleted",
+            data: result
+        })
+    })
+})
+
+// metode
+app.post('/obat/:id/buy', (req, res) =>{
+    let request = req.body
+    db.query(`
+        select* from obat where id =?
+    `, [req.params.id], (error, result) => {
+        if(error) throw error
+
+        if(result.length <= 0){
+            res.json({
+                success: false,
+                message: 'There is no roduct with id' + req.params.id
+            })
+        } else {
+            let data = result [0]
+
+            res.json({
+                success: true,
+                message: 'You are about to buy' + data.nama + 'and will be delivered to' + request.username + 
+                '. You will be charged Rp. ' + (request.jumlah * data.harga) + '. Please choose your payment method.',
+                data: {
+                    transaction_code: 'ORD',
+                    shipping_data: request,
+                   payment_methods: [{
+                       code: '001',
+                       name: 'BRI Virtual Account'
+                    },
+                    { 
+                        code: '002',
+                        name: 'BCA Virtual Account'
+                    }]  
+                }
+            })
+        }
+    })
+})
+
+app.post('/checkout', (req, res)=>{
+    res.json({
+        success: true,
+        message: 'Your order has been recorded.',
+        data: req.body
+    })
+})
+
 app.listen(3000, () => {
     console.log('App is running on port 3000')
 })  
